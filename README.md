@@ -134,25 +134,34 @@ The example app does **not** use a single global `NavigationPath` for everything
 - **Scheme:** `container-example`
 - **Parser:** **`AppDeepLink.parse(url:)`** in **`FlowRoutes.swift`** (extend for production universal links).
 - **Delivery:** **`ContentView`** uses **`.onOpenURL`**; if **`parse`** returns non-`nil`, **`navRouter.apply(deepLink:)`** runs.
-- **Registration:** The app target sets **`INFOPLIST_KEY_CFBundleURLTypes`** so iOS can open **`container-example://`** URLs into **ContainerExample**.
+- **Registration:** **`Example/ContainerExample/Info.plist`** declares **`CFBundleURLTypes`** (scheme `container-example`). The **ContainerExample** target sets **`INFOPLIST_FILE`** and **`GENERATE_INFOPLIST_FILE = YES`**, so Xcode merges that plist with the generated entries (display name, scene manifest, etc.). Relying on **`INFOPLIST_KEY_CFBundleURLTypes`** alone may not produce **`CFBundleURLTypes`** in the built app, which leads to **`openurl`** failures (OSStatus **-10814**, no registered handler).
 
 ### Testing deep links in the Simulator
 
 1. **Build and run** **ContainerExample** on a simulator (so the app is installed with the URL scheme).
 2. **Leave the app in the foreground or background** (not required to be on a specific tab).
-3. From Terminal, send a URL to the **booted** simulator:
+3. From Terminal, send a URL to the **booted** simulator. Every URL the stub parser accepts (see **`FlowRoutes.swift`**), as **`openurl booted`** commands:
 
    ```bash
+   # Tab only (no detail push)
+   xcrun simctl openurl booted "container-example://tab/landing"
+   xcrun simctl openurl booted "container-example://tab/launches"
+   xcrun simctl openurl booted "container-example://tab/products"
+
+   # Landing — detail A vs B (`beta` is the only path that opens detail B; anything else or no path → A)
    xcrun simctl openurl booted "container-example://landing/alpha"
+   xcrun simctl openurl booted "container-example://landing/beta"
+
+   # Launches
+   xcrun simctl openurl booted "container-example://launches/alpha"
+   xcrun simctl openurl booted "container-example://launches/beta"
+
+   # Products
+   xcrun simctl openurl booted "container-example://products/alpha"
+   xcrun simctl openurl booted "container-example://products/beta"
    ```
 
-   Other patterns supported by the stub parser (see **`FlowRoutes.swift`**):
-
-   - **`container-example://landing/beta`** — landing flow, second stub detail.
-   - **`container-example://launches/alpha`** / **`…/beta`** — launches flow.
-   - **`container-example://products/alpha`** / **`…/beta`** — products flow.
-   - **`container-example://tab/launches`** — switch tab only (no detail push).
-   - Same for **`tab/landing`** and **`tab/products`**.
+   Equivalent to **detail A**: omit the path (e.g. `container-example://products`) or use any first segment except **`beta`** (e.g. `…/foo`). There is no separate parser case for **`alpha`**—it is just a readable alias for the default.
 
 4. **Pick a specific device** if you use multiple simulators:
 
@@ -161,7 +170,7 @@ The example app does **not** use a single global `NavigationPath` for everything
    xcrun simctl openurl <DEVICE_UDID> "container-example://tab/products"
    ```
 
-5. **If nothing happens**, confirm the **scheme** matches exactly (`container-example`), the app was built with URL types, and the simulator that received **openurl** is the one running your build.
+5. **If nothing happens** (or you see **-10814**), confirm **`CFBundleURLTypes`** appears in the built **`ContainerExample.app/Info.plist`** (e.g. `plutil -p …/Info.plist`), the **scheme** matches exactly (`container-example`), and the simulator that received **openurl** is the one where you installed the app.
 
 6. **Safari in Simulator** — You can also type `container-example://landing/alpha` in the address bar; iOS should prompt to open the app if the scheme is registered.
 
