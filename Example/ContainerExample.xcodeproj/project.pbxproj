@@ -32,6 +32,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		info0inf0plist0001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		a1b2c3d41e2f4080a1b2c3d2 /* ContainerExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerExampleApp.swift; sourceTree = "<group>"; };
 		a1b2c3d41e2f4080a1b2c3d4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		b2e4080a1b2c3d41e0000200 /* FlowRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowRoutes.swift; sourceTree = "<group>"; };
@@ -71,6 +72,7 @@
 		1e014987af25f467066926e0 /* ContainerExample */ = {
 			isa = PBXGroup;
 			children = (
+				info0inf0plist0001 /* Info.plist */,
 				a1b2c3d41e2f4080a1b2c3d2 /* ContainerExampleApp.swift */,
 				a1b2c3d41e2f4080a1b2c3d4 /* ContentView.swift */,
 				b2e4080a1b2c3d41e0000202 /* NavRouter.swift */,
@@ -380,14 +382,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.jetstream.ContainerExample.url";
-						CFBundleURLSchemes = (
-							"container-example",
-						);
-					},
-				);
+				INFOPLIST_FILE = ContainerExample/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -415,14 +410,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.jetstream.ContainerExample.url";
-						CFBundleURLSchemes = (
-							"container-example",
-						);
-					},
-				);
+				INFOPLIST_FILE = ContainerExample/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
