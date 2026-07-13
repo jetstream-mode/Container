@@ -27,7 +27,7 @@ Every example screen follows the same separation of concerns:
 
 The package type **`ScreenContainer`** implements the pipeline:
 
-```22:24:Sources/Container/ScreenContainer.swift
+```38:40:Sources/Container/ScreenContainer.swift
     public var body: some View {
         display(mapContent(model))
     }
@@ -35,11 +35,40 @@ The package type **`ScreenContainer`** implements the pipeline:
 
 So at runtime: **model → `mapContent` → `Content` → `display(Content)` → SwiftUI tree**.
 
+### The closure contracts
+
+`ScreenContainer` holds the model as a plain constant — observation comes from `mapContent`
+reading model properties during body evaluation, so no property wrapper is involved. The
+two closures carry the unidirectional contract:
+
+- **`mapContent` must be pure**: a synchronous projection of model state with no side
+  effects, no async work, no mutation. It runs on every body evaluation.
+- **`display` consumes the content value only** and should not capture the model. Actions
+  live on the model, invoked from lifecycle modifiers (`.task`, `.refreshable`) on the
+  surrounding `Screen`.
+
+### Skipping unchanged renders
+
+When your `Content` conforms to `Equatable`, use the factory instead of the initializer:
+
+```swift
+ScreenContainer.equatable(
+    model: model,
+    mapContent: Feature.buildContent(from:),
+    display: { Display(content: $0) }
+)
+```
+
+Model changes that map to **equal content** skip the display layout pass entirely (the
+mapper still runs; the view tree diff doesn't). Beyond the performance win, it makes the
+pattern's premise compiler-checkable: Content is a value snapshot, and `Equatable` is what
+that buys you.
+
 ## `Screen` vs `Display`
 
 In the example, each feature defines:
 
-- **`Feature.Screen`** — Holds `@Bindable model`, builds `ScreenContainer(model:mapContent:display:)`, and attaches lifecycle modifiers (`.task`, `.refreshable`) that call **Model** methods. Sometimes uses `makeDisplay(content:)` to construct **Display** with extra dependencies.
+- **`Feature.Screen`** — Holds the model (`@Bindable` only if the screen actually derives bindings from it; a plain `let` observes fine), builds `ScreenContainer(model:mapContent:display:)`, and attaches lifecycle modifiers (`.task`, `.refreshable`) that call **Model** methods. Sometimes uses `makeDisplay(content:)` to construct **Display** with extra dependencies.
 - **`Feature.Display`** — Stateless (or nearly) UI from **`Content`**; uses **Model** only when the screen needs two-way actions (e.g. toggling `model.navigation.showLaunchTimes`).
 
 When you only need one-way presentation, prefer **`@Environment(\.navRouter)`** and **`navRouter?.push(SomeRoute.detail)`** for navigation instead of pushing more flags through Model.
