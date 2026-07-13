@@ -33,3 +33,30 @@ private struct MappedContent: Equatable {
     #expect(mapped.value == 1)
     _ = view.body
 }
+
+// MARK: - Equatable fast path
+
+@MainActor
+@Test func equatableFactoryBuildsAndMapsLikeThePlainInitializer() {
+    let model = ScreenContainerTestModel()
+    model.bump()
+    let view = ScreenContainer.equatable(
+        model: model,
+        mapContent: { MappedContent(value: $0.value) },
+        display: { content in
+            Text("v:\(content.value)")
+        }
+    )
+    _ = view.body
+    #expect(model.value == 1)
+}
+
+@MainActor
+@Test func equatableDisplayComparesByContentAndIgnoresClosures() {
+    let first = EquatableDisplay(content: MappedContent(value: 1)) { _ in EmptyView() }
+    let sameContentDifferentClosure = EquatableDisplay(content: MappedContent(value: 1)) { _ in EmptyView() }
+    let differentContent = EquatableDisplay(content: MappedContent(value: 2)) { _ in EmptyView() }
+
+    #expect(first == sameContentDifferentClosure)
+    #expect(first != differentContent)
+}
