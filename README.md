@@ -47,9 +47,10 @@ two closures carry the unidirectional contract:
   live on the model, invoked from lifecycle modifiers (`.task`, `.refreshable`) on the
   surrounding `Screen`.
 
-### Skipping unchanged renders
+### Skipping unchanged renders — an opt-in escape hatch, not a default
 
-When your `Content` conforms to `Equatable`, use the factory instead of the initializer:
+`ScreenContainer.equatable` exists for when profiling shows `Display` re-evaluation is
+genuinely expensive and worth gating:
 
 ```swift
 ScreenContainer.equatable(
@@ -60,9 +61,29 @@ ScreenContainer.equatable(
 ```
 
 Model changes that map to **equal content** skip the display layout pass entirely (the
-mapper still runs; the view tree diff doesn't). Beyond the performance win, it makes the
-pattern's premise compiler-checkable: Content is a value snapshot, and `Equatable` is what
-that buys you.
+mapper still runs; the view tree diff doesn't).
+
+**Reach for it deliberately, not reflexively — the tradeoffs are real:**
+
+- **The equality check itself isn't free.** It's an O(n) walk over whatever `Content`
+  holds. If content genuinely changes close to as often as `state` invalidates, you pay
+  for the comparison *and* still re-render — strictly worse than the plain initializer.
+- **It couples a performance decision to a correctness one.** If a field is missing from
+  `Content` (forgotten in `mapContent`), two logically different states can produce
+  equal `Content` — `==` says true, and `Display` silently never re-runs. Without the
+  gate that's an obvious "this field is missing" bug; with it, it's a much harder
+  "why is the UI frozen" bug, because everything else about the screen looks fine.
+- **It's a standing tax on every field you add** — each one needs to conform to
+  `Equatable` and needs someone to ask whether it belongs in the equality check at all
+  (a debug-only field that always differs defeats the gate silently; one that's missing
+  makes it over-fire).
+
+The verdict: reach for `.equatable` when `Content` is cheap to compare and changes are
+infrequent relative to state churn — and treat it as a targeted fix for a measured
+problem, not a starting default. `Content` being `Equatable` is still worth keeping even
+when you don't call `.equatable` yet — it's free (synthesized), useful for test
+assertions, and makes adopting the factory later a one-line change in `Screen` rather
+than a type-by-type migration.
 
 ## `Screen` vs `Display`
 
