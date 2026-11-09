@@ -14,7 +14,11 @@ extension Landing {
 
     @MainActor
     @Observable
-    final class Model {
+    final class Model: ScreenModel {
+        enum Action {
+            case showLaunchTimes
+        }
+
         private static let heroImageURLString = "https://picsum.photos/id/29/1200/600"
 
         static var heroImageURL: URL {
@@ -31,6 +35,13 @@ extension Landing {
 
         init(imageLoader: any ImageLoader = URLSessionImageLoader()) {
             self.imageLoader = imageLoader
+        }
+
+        func send(_ action: Action) {
+            switch action {
+            case .showLaunchTimes:
+                navigation.showLaunchTimes = true
+            }
         }
 
         func loadHeroImage() async {
