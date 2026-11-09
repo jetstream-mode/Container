@@ -5,29 +5,23 @@ enum Landing {}
 
 extension Landing {
     struct Screen: View {
-        @Bindable private var model: Model
+        private let model: Model
 
         init(model: Model) {
             self.model = model
         }
 
         var body: some View {
-            ScreenContainer(
-                model: model,
-                mapContent: Landing.buildContent(from:),
-                display: makeDisplay(content:)
-            )
+            ScreenContainer(model: model, mapContent: Landing.buildContent(from:)) { content, send in
+                Display(content: content, send: send)
+            }
             .task { await model.loadHeroImage() }
-        }
-
-        private func makeDisplay(content: LandingScreenContent) -> Display {
-            Display(content: content, model: model)
         }
     }
 
     struct Display: View {
         let content: LandingScreenContent
-        @Bindable var model: Model
+        let send: Send<Model.Action>
         @Environment(\.navRouter) private var navRouter
 
         var body: some View {
@@ -52,9 +46,7 @@ extension Landing {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button(content.buttonTitle) {
-                        model.navigation.showLaunchTimes = true
-                    }
+                    Button(content.buttonTitle, action: showLaunchTimes)
                     .buttonStyle(.borderedProminent)
                     HStack(spacing: 12) {
                         Button("Detail A") { navRouter?.push(LandingRoute.detailAlpha) }
@@ -67,6 +59,10 @@ extension Landing {
                 .padding()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+
+        private func showLaunchTimes() {
+            send(.showLaunchTimes)
         }
     }
 }

@@ -43,9 +43,79 @@ two closures carry the unidirectional contract:
 
 - **`mapContent` must be pure**: a synchronous projection of model state with no side
   effects, no async work, no mutation. It runs on every body evaluation.
-- **`display` consumes the content value only** and should not capture the model. Actions
-  live on the model, invoked from lifecycle modifiers (`.task`, `.refreshable`) on the
-  surrounding `Screen`.
+- **`display` consumes the content value only** and never captures the model. User intent
+  goes back up through a **`Send`** (see [Actions](#actions-state-down-intent-up)); lifecycle
+  work (`.task`, `.refreshable`) is attached by the surrounding `Screen`.
+
+### Actions: state down, intent up
+
+A model that conforms to **`ScreenModel`** declares an `Action` type and a `send(_:)`
+handler. `ScreenContainer` then hands the display a **`Send<Action>`** instead of the model:
+
+```swift
+extension Landing {
+    @MainActor @Observable
+    final class Model: ScreenModel {
+        enum Action { case showLaunchTimes }
+
+        func send(_ action: Action) {
+            switch action {
+            case .showLaunchTimes: navigation.showLaunchTimes = true
+            }
+        }
+    }
+
+    struct Screen: View {
+        private let model: Model
+
+        var body: some View {
+            ScreenContainer(model: model, mapContent: Landing.buildContent(from:)) { content, send in
+                Display(content: content, send: send)
+            }
+        }
+    }
+
+    struct Display: View {
+        let content: LandingScreenContent
+        let send: Send<Model.Action>
+
+        var body: some View {
+            Button(content.buttonTitle, action: showLaunchTimes)
+        }
+
+        private func showLaunchTimes() { send(.showLaunchTimes) }
+    }
+}
+```
+
+The loop is one-way end to end: **model → `Content` → display → `Action` → model**. The
+display can render and report, but it can't read or mutate model state, and every rule
+about what an action *does* lives in one testable `send(_:)`.
+
+- **Subviews** take the same `Send`, or a scoped one for their own action type:
+  `send.map(Action.lead)` turns a `Send<Action>` into a `Send<LeadAction>`.
+- **Previews and tests** build displays without a model: `Send { print($0) }`, or
+  `Send.ignoring` for static previews.
+- **Async work** started by an action runs in a `Task` the model stores, so it can be
+  cancelled on the next action and awaited by tests.
+- **Form controls** that need a `Binding` take `value:` plus a callback that sends an
+  action, rather than binding to model state. The exception is `TextField`, which needs a
+  real binding for text input: keep it in `Screen` bound to the model (`@Bindable`), and
+  enforce input rules in the model rather than in `onChange`.
+- **`.equatable`** has a matching overload taking `(content, send)`. Its skip check
+  compares the content *and* the `Send`'s owner, so equal content from a replaced model
+  still re-renders.
+
+Models that don't conform to `ScreenModel` keep working with the original
+`display: (Content) -> View` initializer.
+
+### Values that change faster than people interact
+
+`mapContent` re-runs, and the display re-evaluates, whenever any model property it reads
+changes. That's right for user-paced state, but a value updating many times a second
+(a playhead, a level meter, a download's progress ticks) would rebuild the whole screen at
+that rate. Keep such values **out of `Content`**: give them a small leaf view that observes
+their source directly, and let `Content` carry only what's needed to place that leaf.
 
 ### Skipping unchanged renders — an opt-in escape hatch, not a default
 
@@ -89,8 +159,8 @@ than a type-by-type migration.
 
 In the example, each feature defines:
 
-- **`Feature.Screen`** — Holds the model (`@Bindable` only if the screen actually derives bindings from it; a plain `let` observes fine), builds `ScreenContainer(model:mapContent:display:)`, and attaches lifecycle modifiers (`.task`, `.refreshable`) that call **Model** methods. Sometimes uses `makeDisplay(content:)` to construct **Display** with extra dependencies.
-- **`Feature.Display`** — Stateless (or nearly) UI from **`Content`**; uses **Model** only when the screen needs two-way actions (e.g. toggling `model.navigation.showLaunchTimes`).
+- **`Feature.Screen`** — Holds the model (`@Bindable` only if the screen actually derives bindings from it, e.g. a `TextField` or a sheet's `isPresented`; a plain `let` observes fine), builds `ScreenContainer`, and attaches lifecycle modifiers (`.task`, `.refreshable`) that call **Model** methods.
+- **`Feature.Display`** — Stateless (or nearly) UI from **`Content`**, reporting user intent through **`Send`**. It never takes the model.
 
 When you only need one-way presentation, prefer **`@Environment(\.navRouter)`** and **`navRouter?.push(SomeRoute.detail)`** for navigation instead of pushing more flags through Model.
 
@@ -110,7 +180,8 @@ Use a **sentinel enum** `enum Settings {}` so `extension Settings` can hold `Mod
 
 ### 2. Implement **Model**
 
-- Mark the class **`@MainActor`**, **`@Observable`**.
+- Mark the class **`@MainActor`**, **`@Observable`**, and conform to **`ScreenModel`** if the screen has user actions.
+- Declare **`enum Action`** for every user intent and handle it in **`send(_:)`**.
 - Put domain state in **`State`**; use **`Navigation`** (or similar) only for **cross-feature intents** that the app root observes (e.g. switching tabs), not for every pushed detail.
 - Inject services via **`init(...)`** with defaults for previews.
 - Expose **`async`** loaders/actors; call them from **`Screen`** with `.task` / `.refreshable`.
@@ -123,8 +194,8 @@ Use a **sentinel enum** `enum Settings {}` so `extension Settings` can hold `Mod
 
 ### 4. Implement **Display** and **Screen**
 
-- **`Screen.body`**: `ScreenContainer(model: model, mapContent: YourFeature.buildContent(from:), display: makeDisplay(content:))` plus `.task` / `.refreshable` as needed.
-- **`Display`**: Prefer `let content: YourScreenContent` only. Use **`NavigationStack`** only if this screen is a **root** elsewhere; in the example app, roots live inside **`AppShellView`**.
+- **`Screen.body`**: `ScreenContainer(model: model, mapContent: YourFeature.buildContent(from:)) { content, send in Display(content: content, send: send) }` plus `.task` / `.refreshable` as needed.
+- **`Display`**: `let content: YourScreenContent` and `let send: Send<Model.Action>`; nothing else from the model. Use **`NavigationStack`** only if this screen is a **root** elsewhere; in the example app, roots live inside **`AppShellView`**.
 - For in-tab navigation, read **`@Environment(\.navRouter) private var navRouter`** and call **`navRouter?.push(MyRoute.something)`** (see [Navigation](#navigation)).
 
 ### 5. Register routes and stack (if the screen is pushed inside a tab)
